@@ -4,7 +4,6 @@
 #include "esphome/components/climate/climate.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/log.h"
-#include <set>
 
 namespace esphome {
 namespace gree {
@@ -91,7 +90,6 @@ class GreeClimate : public climate::Climate, public uart::UARTDevice, public Pol
   void update() override;
   void dump_config() override;
   void control(const climate::ClimateCall &call) override;
-  void set_supported_presets(const std::set<climate::ClimatePreset> &presets) { this->supported_presets_ = presets; }
   // void set_supported_swing_modes(const std::set<climate::ClimateSwingMode> &modes) {
   //   this->supported_swing_modes_ = modes;
   // }
@@ -115,7 +113,6 @@ class GreeClimate : public climate::Climate, public uart::UARTDevice, public Pol
 
   bool receiving_packet_ = false;
 
-  std::set<climate::ClimatePreset> supported_presets_{};
   // std::set<climate::ClimateSwingMode> supported_swing_modes_{};
 };
 

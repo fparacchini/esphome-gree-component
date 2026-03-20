@@ -108,8 +108,6 @@ climate::ClimateTraits GreeClimate::traits() {
   // traits.set_supported_swing_modes(this->supported_swing_modes_);
   traits.add_feature_flags(climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE);
 
-  traits.set_supported_presets(this->supported_presets_);
-
   traits.add_supported_preset(climate::CLIMATE_PRESET_NONE);
   traits.add_supported_preset(climate::CLIMATE_PRESET_BOOST);
   // traits.add_supported_preset(climate::CLIMATE_PRESET_SLEEP);
