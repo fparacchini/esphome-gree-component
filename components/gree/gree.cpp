@@ -400,15 +400,19 @@ void GreeClimate::send_data_(const uint8_t *message, uint8_t size) {
   dump_message_("Sent message", message, size);
 
   // Discard echo: SP3485 receiver is always active, so TX bytes leak into RX buffer.
-  // At 9600 baud, 47 bytes = ~49ms. flush() waited for TX complete; small delay for last echo byte.
-  delay(5);
+  // IMPORTANT: discard only up to TX size; keep any extra bytes for real response parsing.
+  const uint32_t start_ms = millis();
   uint8_t discarded = 0;
-  while (this->available()) {
+  while (discarded < size && (millis() - start_ms) < 30) {
+    if (!this->available()) {
+      delay(1);
+      continue;
+    }
     this->read();
     discarded++;
   }
   if (discarded > 0) {
-    ESP_LOGI(TAG, "Discarded %u echo bytes after TX", discarded);
+    ESP_LOGI(TAG, "Discarded %u/%u echo bytes after TX", discarded, size);
   }
 }
 
