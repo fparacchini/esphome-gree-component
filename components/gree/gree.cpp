@@ -396,7 +396,20 @@ void GreeClimate::control(const climate::ClimateCall &call) {
 
 void GreeClimate::send_data_(const uint8_t *message, uint8_t size) {
   this->write_array(message, size);
+  this->flush();
   dump_message_("Sent message", message, size);
+
+  // Discard echo: SP3485 receiver is always active, so TX bytes leak into RX buffer.
+  // At 9600 baud, 47 bytes = ~49ms. flush() waited for TX complete; small delay for last echo byte.
+  delay(5);
+  uint8_t discarded = 0;
+  while (this->available()) {
+    this->read();
+    discarded++;
+  }
+  if (discarded > 0) {
+    ESP_LOGI(TAG, "Discarded %u echo bytes after TX", discarded);
+  }
 }
 
 void GreeClimate::dump_message_(const char *title, const uint8_t *message, uint8_t size) {
