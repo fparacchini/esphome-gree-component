@@ -51,6 +51,7 @@ void GreeClimate::loop() {
     
     if (receiving_packet_) {
       this->read_byte( &raw_packet->header.data_length );
+      receive_start_ms_ = millis();
 
       if (raw_packet->header.data_length + sizeof(gree_header_t) > GREE_RX_BUFFER_SIZE) {
         ESP_LOGE(TAG, "Incoming packet is too big! header.data_length = %d, maximum is %d", raw_packet->header.data_length, GREE_RX_BUFFER_SIZE - sizeof(gree_header_t));
@@ -60,14 +61,33 @@ void GreeClimate::loop() {
     }
   }
 
-  if (receiving_packet_ && this->available() >= raw_packet->header.data_length) {
-    this->read_array(raw_packet->data, raw_packet->header.data_length);
+  if (receiving_packet_) {
+    // Timeout: if we've been waiting >50ms for data, the response is shorter than expected
+    if (this->available() < raw_packet->header.data_length && (millis() - receive_start_ms_) > 50) {
+      uint8_t got = this->available();
+      ESP_LOGI(TAG, "RX timeout: expected %u data bytes, got %u available (total=%u). Response is shorter than header indicates.",
+        raw_packet->header.data_length, got, got + (uint8_t)sizeof(gree_header_t));
+      if (got > 0) {
+        uint8_t to_read = got < (GREE_RX_BUFFER_SIZE - sizeof(gree_header_t)) ? got : (GREE_RX_BUFFER_SIZE - sizeof(gree_header_t));
+        this->read_array(raw_packet->data, to_read);
+        uint8_t total = to_read + sizeof(gree_header_t);
+        dump_message_("Read array (truncated)", this->data_read_, total);
+        read_state_(this->data_read_, total);
+      }
+      receiving_packet_ = false;
+      memset(this->data_read_, 0, GREE_RX_BUFFER_SIZE);
+      return;
+    }
 
-    dump_message_("Read array", this->data_read_, raw_packet->header.data_length + sizeof(gree_header_t));
-    read_state_(this->data_read_, raw_packet->header.data_length + sizeof(gree_header_t));
-    
-    receiving_packet_ = false;
-    memset(this->data_read_, 0, GREE_RX_BUFFER_SIZE);
+    if (this->available() >= raw_packet->header.data_length) {
+      this->read_array(raw_packet->data, raw_packet->header.data_length);
+
+      dump_message_("Read array", this->data_read_, raw_packet->header.data_length + sizeof(gree_header_t));
+      read_state_(this->data_read_, raw_packet->header.data_length + sizeof(gree_header_t));
+      
+      receiving_packet_ = false;
+      memset(this->data_read_, 0, GREE_RX_BUFFER_SIZE);
+    }
   }
 }
 
@@ -120,6 +140,19 @@ void GreeClimate::read_state_(const uint8_t *data, uint8_t size) {
   uint8_t data_crc = data[size-1];
   // get checksum byte based on received data (calculating)
   uint8_t get_crc = get_checksum_(data, size);
+
+  // Debug: dump packet and checksum details
+  {
+    char dbg[250] = {0};
+    char *dp = dbg;
+    uint8_t dump_sz = size < 52 ? size : 52;
+    for (int i = 0; i < dump_sz; i++) {
+      dp += sprintf(dp, "%02X ", data[i]);
+    }
+    ESP_LOGI(TAG, "RX pkt [%u bytes]: %s%s", size, dbg, size > dump_sz ? "..." : "");
+    ESP_LOGI(TAG, "CRC: received=0x%02X calculated=0x%02X %s | type=0x%02X (expect 0x31)",
+      data_crc, get_crc, (data_crc == get_crc) ? "OK" : "FAIL", data[3]);
+  }
 
   if (data_crc != get_crc) {
     ESP_LOGW(TAG, "Invalid checksum.");
@@ -367,14 +400,14 @@ void GreeClimate::send_data_(const uint8_t *message, uint8_t size) {
 }
 
 void GreeClimate::dump_message_(const char *title, const uint8_t *message, uint8_t size) {
-  ESP_LOGV(TAG, "%s:", title);
+  ESP_LOGI(TAG, "%s:", title);
   char str[250] = {0};
   char *pstr = str;
   if (size * 2 > sizeof(str)) ESP_LOGE(TAG, "too long byte data");
   for (int i = 0; i < size; i++) {
     pstr += sprintf(pstr, "%02X ", message[i]);
   }
-  ESP_LOGV(TAG, "%s", str);
+  ESP_LOGI(TAG, "%s", str);
 }
 
 uint8_t GreeClimate::get_checksum_(const uint8_t *message, size_t size) {

@@ -112,6 +112,7 @@ class GreeClimate : public climate::Climate, public uart::UARTDevice, public Pol
   uint8_t data_read_[GREE_RX_BUFFER_SIZE] = {0};
 
   bool receiving_packet_ = false;
+  uint32_t receive_start_ms_ = 0;
 
   // std::set<climate::ClimateSwingMode> supported_swing_modes_{};
 };
