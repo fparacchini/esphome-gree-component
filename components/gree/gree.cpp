@@ -162,7 +162,6 @@ void GreeClimate::read_state_(const uint8_t *data, uint8_t size) {
 
   // Debug: dump packet and checksum details
   {
-      return;
     char dbg[250] = {0};
     char *dp = dbg;
     uint8_t dump_sz = size < 52 ? size : 52;
