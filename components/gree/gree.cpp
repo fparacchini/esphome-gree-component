@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstring>
 #include "gree.h"
 #include "esphome/core/macros.h"
 
@@ -72,7 +73,11 @@ void GreeClimate::loop() {
         this->read_array(raw_packet->data, to_read);
         uint8_t total = to_read + sizeof(gree_header_t);
         dump_message_("Read array (truncated)", this->data_read_, total);
-        read_state_(this->data_read_, total);
+        if (total <= sizeof(data_write_) && memcmp(this->data_read_, data_write_, total) == 0) {
+          ESP_LOGI(TAG, "Ignored echoed TX frame (%u bytes, truncated)", total);
+        } else {
+          read_state_(this->data_read_, total);
+        }
       }
       receiving_packet_ = false;
       memset(this->data_read_, 0, GREE_RX_BUFFER_SIZE);
@@ -82,8 +87,13 @@ void GreeClimate::loop() {
     if (this->available() >= raw_packet->header.data_length) {
       this->read_array(raw_packet->data, raw_packet->header.data_length);
 
-      dump_message_("Read array", this->data_read_, raw_packet->header.data_length + sizeof(gree_header_t));
-      read_state_(this->data_read_, raw_packet->header.data_length + sizeof(gree_header_t));
+      uint8_t total = raw_packet->header.data_length + sizeof(gree_header_t);
+      dump_message_("Read array", this->data_read_, total);
+      if (total <= sizeof(data_write_) && memcmp(this->data_read_, data_write_, total) == 0) {
+        ESP_LOGI(TAG, "Ignored echoed TX frame (%u bytes)", total);
+      } else {
+        read_state_(this->data_read_, total);
+      }
       
       receiving_packet_ = false;
       memset(this->data_read_, 0, GREE_RX_BUFFER_SIZE);
