@@ -145,6 +145,16 @@ climate::ClimateTraits GreeClimate::traits() {
 }
 
 void GreeClimate::read_state_(const uint8_t *data, uint8_t size) {
+  if (size < 4) {
+    ESP_LOGW(TAG, "Invalid frame size: %u", size);
+    return;
+  }
+
+  if (data[0] != GREE_START_BYTE || data[1] != GREE_START_BYTE) {
+    ESP_LOGW(TAG, "Invalid frame header: %02X %02X", data[0], data[1]);
+    return;
+  }
+
   // get checksum byte from received data (using the last byte)
   uint8_t data_crc = data[size-1];
   // get checksum byte based on received data (calculating)
@@ -152,6 +162,7 @@ void GreeClimate::read_state_(const uint8_t *data, uint8_t size) {
 
   // Debug: dump packet and checksum details
   {
+      return;
     char dbg[250] = {0};
     char *dp = dbg;
     uint8_t dump_sz = size < 52 ? size : 52;
