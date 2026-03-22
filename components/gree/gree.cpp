@@ -63,8 +63,8 @@ void GreeClimate::loop() {
   }
 
   if (receiving_packet_) {
-    // Timeout: if we've been waiting >50ms for data, the response is shorter than expected
-    if (this->available() < raw_packet->header.data_length && (millis() - receive_start_ms_) > 50) {
+    // Timeout: if we've been waiting >80ms for data, the response is shorter than expected
+    if (this->available() < raw_packet->header.data_length && (millis() - receive_start_ms_) > 80) {
       uint8_t got = this->available();
       ESP_LOGI(TAG, "RX timeout: expected %u data bytes, got %u available (total=%u). Response is shorter than header indicates.",
         raw_packet->header.data_length, got, got + (uint8_t)sizeof(gree_header_t));
@@ -81,7 +81,6 @@ void GreeClimate::loop() {
       }
       receiving_packet_ = false;
       memset(this->data_read_, 0, GREE_RX_BUFFER_SIZE);
-      return;
     }
 
     if (this->available() >= raw_packet->header.data_length) {
@@ -408,22 +407,6 @@ void GreeClimate::send_data_(const uint8_t *message, uint8_t size) {
   this->write_array(message, size);
   this->flush();
   dump_message_("Sent message", message, size);
-
-  // Discard echo: SP3485 receiver is always active, so TX bytes leak into RX buffer.
-  // IMPORTANT: discard only up to TX size; keep any extra bytes for real response parsing.
-  const uint32_t start_ms = millis();
-  uint8_t discarded = 0;
-  while (discarded < size && (millis() - start_ms) < 30) {
-    if (!this->available()) {
-      delay(1);
-      continue;
-    }
-    this->read();
-    discarded++;
-  }
-  if (discarded > 0) {
-    ESP_LOGI(TAG, "Discarded %u/%u echo bytes after TX", discarded, size);
-  }
 }
 
 void GreeClimate::dump_message_(const char *title, const uint8_t *message, uint8_t size) {
